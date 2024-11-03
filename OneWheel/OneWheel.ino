@@ -1,7 +1,8 @@
 #include <Wire.h>
-#include <MPU6050.h>  // Library for the MPU6050 gyroscope/accelerometer
+#include <Adafruit_MPU9250.h>
 
-MPU6050 mpu;
+Adafruit_MPU9250 mpu;
+
 const int motorPwmPin = 9;      // PWM pin for motor speed
 const int motorDirPin = 8;      // Direction pin
 const int brakeSwitchPin = 7;   // Brake switch pin
@@ -13,23 +14,25 @@ float integral = 0.0, previous_error = 0.0;  // PID variables
 void setup() {
   Serial.begin(9600);
   Wire.begin();
-  mpu.initialize();
-  
+
+  if (!mpu.begin()) {
+    Serial.println("Could not find a valid MPU9250 sensor, check wiring!");
+    while (1);
+  }
+  Serial.println("MPU9250 Found!");
+
   pinMode(motorPwmPin, OUTPUT);
   pinMode(motorDirPin, OUTPUT);
   pinMode(brakeSwitchPin, INPUT_PULLUP);  // Using internal pull-up resistor
-  
-  if (mpu.testConnection()) {
-    Serial.println("MPU6050 connection successful");
-  } else {
-    Serial.println("MPU6050 connection failed");
-  }
 }
 
 // Function to get tilt angle from the MPU6050
 float getTiltAngle() {
-  int16_t ax, ay, az;
-  mpu.getAcceleration(&ax, &ay, &az);
+  mpu.read();
+  
+  float ax = mpu.accelX();
+  float ay = mpu.accelY();
+  float az = mpu.accelZ();
   
   // Calculate the tilt angle (adjust based on your orientation)
   float angle = atan2(ay, az) * 180 / PI;

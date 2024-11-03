@@ -4,7 +4,7 @@
 
 - **Arduino Uno**
 - **RioRand 400W 6-60V PWM Brushless Motor Driver**
-- **MPU6050 Gyroscope + Accelerometer**
+- **MPU9250 Gyroscope + Accelerometer**
 - **Brushless Motor**
 - **Brake Switch**
 - **Connecting Wires**
@@ -16,9 +16,9 @@
    - **M+ and M-**: Connect to the brushless motor.
    - **PWM Input**: Connect to Arduino pin **9** (PWM pin).
    - **DIR Input**: Connect to Arduino pin **8** (digital pin) to control motor direction.
-   - **Power Terminals**: Connect to an appropriate power supply for your motor driver and motor (e.g., 24V or 36V, depending on your motor specifications).
+   - **Power Terminals**: Connect to an appropriate power supply for your motor driver and motor (e.g., 24V or 36V).
 
-### 2. **Gyroscope + Accelerometer (MPU6050)**
+### 2. **Gyroscope + Accelerometer (MPU9250)**
    - **SDA (Serial Data)**: Connect to Arduino pin **A4**.
    - **SCL (Serial Clock)**: Connect to Arduino pin **A5**.
    - **VCC**: Connect to Arduino **5V**.
