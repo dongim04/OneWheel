@@ -1,7 +1,14 @@
 #include <Wire.h>
-#include <Adafruit_MPU9250.h>
 
-Adafruit_MPU9250 mpu;
+const int MPU_addr=0x68; // I2C address for the MPU
+int16_t AcX,AcY,AcZ; // Variables for accelerometer X,Y,Z
+ 
+int minVal=265; // Minimum value for angle
+int maxVal=402; // Maximum value for angle 
+ 
+double x; //x, y, and z angle, for MPU
+double y;
+double z;
 
 const int motorPwmPin = 9;      // PWM pin for motor speed
 const int motorDirPin = 8;      // Direction pin
@@ -12,14 +19,12 @@ float setpoint = 0.0;  // Target angle for balance
 float integral = 0.0, previous_error = 0.0;  // PID variables
 
 void setup() {
-  Serial.begin(9600);
   Wire.begin();
-
-  if (!mpu.begin()) {
-    Serial.println("Could not find a valid MPU9250 sensor, check wiring!");
-    while (1);
-  }
-  Serial.println("MPU9250 Found!");
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x6B);
+  Wire.write(0);
+  Wire.endTransmission(true);
+  Serial.begin(9600);
 
   pinMode(motorPwmPin, OUTPUT);
   pinMode(motorDirPin, OUTPUT);
@@ -28,15 +33,22 @@ void setup() {
 
 // Function to get tilt angle from the MPU6050
 float getTiltAngle() {
-  mpu.read();
-  
-  float ax = mpu.accelX();
-  float ay = mpu.accelY();
-  float az = mpu.accelZ();
-  
-  // Calculate the tilt angle (adjust based on your orientation)
-  float angle = atan2(ay, az) * 180 / PI;
-  return angle;
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x3B);
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU_addr,14,true);
+  AcX=Wire.read()<<8|Wire.read();
+  AcY=Wire.read()<<8|Wire.read();
+  AcZ=Wire.read()<<8|Wire.read();
+  int xAng = map(AcX,minVal,maxVal,-90,90);
+  int yAng = map(AcY,minVal,maxVal,-90,90);
+  int zAng = map(AcZ,minVal,maxVal,-90,90);
+ 
+  x= RAD_TO_DEG * (atan2(-yAng, -zAng)+PI);
+  y= RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
+  z= RAD_TO_DEG * (atan2(-yAng, -xAng)+PI);
+
+  return z;
 }
 
 // PID control function to determine the motor speed
