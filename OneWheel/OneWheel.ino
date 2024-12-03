@@ -10,22 +10,35 @@ double x; //x, y, and z angle, for MPU
 double y;
 double z;
 
+const unsigned int BUFFER_SIZE = 16;          // Serial receive buffer size
+const double BAUD_RATE = 115200;  // Serial port baud rate
+const double WHEEL_DIAMETER_IN = 9;            // Motor wheel diamater (inches)
+const double WHEEL_CIRCUMFERENCE_IN = 28.27;     // Motor wheel circumference (inches)
+const double WHEEL_DIAMETER_CM = 22.86;           // Motor wheel diamater (centimeters)
+const double WHEEL_CIRCUMFERENCE_CM = 71.82;      // Motor wheel circumference (centimeters)
+
+
 const int motorPwmPin = 9;      // PWM pin for motor speed
-const int motorDirPin = 8;      // Direction pin
+const int speedPin = 12;        // SC Speed Pulse Output from RioRand board
+const int motorDirPin = 2;      // Direction pin
 const int brakeSwitchPin = 7;   // Brake switch pin
+bool _dir = 0;            // Direction of the motor
+int correctAngle = 0;
 
 float kp = 1.0, ki = 0.5, kd = 0.1;  // PID constants (adjust these based on testing)
 float setpoint = 0.0;  // Target angle for balance
 float integral = 0.0, previous_error = 0.0;  // PID variables
 
 void setup() {
+  // put your setup code here, to run once:
   Wire.begin();
   Wire.beginTransmission(MPU_addr);
   Wire.write(0x6B);
   Wire.write(0);
   Wire.endTransmission(true);
-  Serial.begin(9600);
+  Serial.begin(BAUD_RATE);
 
+  pinMode(speedPin, INPUT);
   pinMode(motorPwmPin, OUTPUT);
   pinMode(motorDirPin, OUTPUT);
   pinMode(brakeSwitchPin, INPUT_PULLUP);  // Using internal pull-up resistor
@@ -43,12 +56,12 @@ float getTiltAngle() {
   int xAng = map(AcX,minVal,maxVal,-90,90);
   int yAng = map(AcY,minVal,maxVal,-90,90);
   int zAng = map(AcZ,minVal,maxVal,-90,90);
- 
+
   x= RAD_TO_DEG * (atan2(-yAng, -zAng)+PI);
   y= RAD_TO_DEG * (atan2(-xAng, -zAng)+PI);
   z= RAD_TO_DEG * (atan2(-yAng, -xAng)+PI);
 
-  return z;
+  return x;
 }
 
 // PID control function to determine the motor speed
@@ -63,31 +76,72 @@ float pidControl(float currentAngle) {
 }
 
 void loop() {
-  // Read tilt angle
-  float currentAngle = getTiltAngle();
-  
+
+  // put your main code here, to run repeatedly:
+  float _currentAngle = getTiltAngle();
+
+  int motorPwmSpeed;
+
   // Calculate PID output
-  float pidOutput = pidControl(currentAngle);
-  int motorSpeed = constrain(abs(pidOutput), 0, 255);  // Constrain to valid PWM range
-
-  // Set motor direction based on tilt angle
-  if (pidOutput > 0) {
-    digitalWrite(motorDirPin, HIGH);  // Forward
-  } else {
-    digitalWrite(motorDirPin, LOW);   // Backward
-  }
-
-  // Check brake switch
-  if (digitalRead(brakeSwitchPin) == LOW) {
-    motorSpeed = 0;  // Stop motor if brake is pressed
-  }
+  if (_currentAngle <= 90.0) {
+          int translateAngle = map(_currentAngle, 0, 45, 0, 255);
+          float pidOutput = pidControl(translateAngle);
+          motorPwmSpeed = constrain(abs(pidOutput), 0, 255);
+          digitalWrite(motorDirPin, HIGH);  // Forward
+          _dir = 0;
+      } else {
+          int adjustedAngle = 360 - _currentAngle;
+          int translateAngle = map(adjustedAngle, 0, 45, 0, 255);
+          float pidOutput = pidControl(translateAngle);
+          motorPwmSpeed = constrain(abs(pidOutput), 0, 255);
+          digitalWrite(motorDirPin, LOW);   // Backward
+          _dir = 1;
+      }
+  /*
+  int translateAngle = map(abs(_currentAngle), 0, 45, 0, 255);
+  int PWM = constrain(abs(translateAngle), 0, 255);
+  */
+  analogWrite(motorPwmPin, PWM);
   
-  // Output speed using PWM
-  analogWrite(motorPwmPin, motorSpeed);
 
-  // Optional: Print debug info
-  Serial.print("Angle: "); Serial.print(currentAngle);
-  Serial.print(" | Motor Speed: "); Serial.println(motorSpeed);
+
+
+  double freq = 0; double rpm = 0; double mph = 0; double kph = 0;
+
+  // Measure the time the pulse is Hi
+  // If pulseIn times out then ontime will equal 0
+  unsigned long ontime = pulseIn(speedPin, HIGH);
+
+  // Only run calculations if ontime > 0
+  if (ontime > 0)
+  {
+    // Calculate the period of the signal
+    unsigned long period = ontime * 2;
+
+    // Calculate the frequency
+    freq = 1000000.0 / period;
+
+    // Calculate the revolutions per minute
+    rpm = freq / 45 * 60; 
+
+    // Calculate the miles per hour (mph) based on the wheel diameter or circumference
+    //mph = (WHEEL_DIAMETER_IN * PI * rpm * 60) / 63360;
+    mph = (WHEEL_CIRCUMFERENCE_IN * rpm * 60) / 63360; 
+
+    // Calculate the miles per hour (kph) based on the wheel diameter or circumference
+    //kph = (WHEEL_DIAMETER_CM * PI * rpm * 60) / 1000;
+    kph = (WHEEL_CIRCUMFERENCE_CM * rpm * 60) / 100000; 
+  }   
   
+  // Write data to the serial port
+  Serial.print("PWM: "); Serial.print(PWM);
+  Serial.print(" | Angle: "); Serial.print(_currentAngle);
+  Serial.print(" | Direction: "); Serial.print(_dir);
+  Serial.print(" | Motor Speed: "); Serial.println(motorPwmSpeed);
+  Serial.print((String)" | Freq:" + freq + " ");
+  Serial.print((String)" | RPM:" + rpm + " ");
+  Serial.print((String)" | MPH:" + mph + " ");
+  Serial.println((String)" | KPH:" + kph + " ");
+
   delay(10);  // Small delay for stability
 }
